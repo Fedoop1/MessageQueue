@@ -2,7 +2,7 @@
 using Confluent.Kafka;
 
 const string kafkaAddress = "host.docker.internal:9092";
-const string targetFolder = "./source";
+const string targetFolder = "./Source";
 const string topicName = "mq.processingService";
 const int defaultChunkSize = 900000 /* ~0.9 mb */;
 
