@@ -34,7 +34,7 @@ try
         {
             BootstrapServers = kafkaAddress,
             ClientId = clientUid,
-            //TransactionalId = appUid,
+            TransactionalId = clientUid,
         };
 
         var producer = new ProducerBuilder<Null, byte[]>(kafkaConfig)
@@ -42,13 +42,15 @@ try
 
         try
         {
-            //producer.BeginTransaction();
+            producer.InitTransactions(TimeSpan.FromMinutes(1));
+
+            producer.BeginTransaction();
             await CaptureFileAsync(eventArgs.FullPath, defaultChunkSize, producer, token);
-            //producer.CommitTransaction();
+            producer.CommitTransaction();
         }
         catch (Exception)
         {
-            //producer.AbortTransaction();
+            producer.AbortTransaction();
             throw;
         }
         finally
@@ -85,12 +87,14 @@ async Task CaptureFileAsync(string filePath, int chunkSize, IProducer<Null, byte
         var headers = new Headers()
         {
             {"FileName", Encoding.Default.GetBytes(fileName)},
-            {"Position", Encoding.Default.GetBytes($"{++currentChunk}")},
+            {"Position", Encoding.Default.GetBytes($"{currentChunk}")},
             {"TotalChunks", Encoding.Default.GetBytes(totalChunks.ToString())},
         };
 
         Console.WriteLine($"Sending {fileName}'s #{currentChunk} chunk...");
         await SendToProcessingServiceAsync(producer, chunk, partition, headers, token);
+
+        currentChunk++;
     }
 }
 
@@ -118,7 +122,8 @@ static async Task SendToProcessingServiceAsync(IProducer<Null, byte[]> producer,
         Value = data,
     };
 
-    await producer.ProduceAsync(partition, message, token);
+    var deliveryResult = await producer.ProduceAsync(partition, message, token);
+    Console.WriteLine($"{deliveryResult.Timestamp.UtcDateTime:s} | Message was delivered to {deliveryResult.Topic} topic with partition #{deliveryResult.Partition.Value}");
 }
 
 static Task SetupCancellation(out CancellationToken token)
