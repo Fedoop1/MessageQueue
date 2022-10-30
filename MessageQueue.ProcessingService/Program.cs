@@ -21,15 +21,17 @@ var cancellationTask = SetupCancellation(out var token);
 
 try
 {
+    var consumerTasks = new Task[partitionCount];
+
     for (var consumerIndex = 0; consumerIndex < partitionCount; consumerIndex++)
     {
         var consumer = SetupConsumer();
         Console.WriteLine($"Consumer {consumer.Name} was initialized");
 
-        RunConsumerAsync(consumer, token);
+        consumerTasks[consumerIndex] = RunConsumerAsync(consumer, token);
     }
 
-    await cancellationTask;
+    await Task.WhenAll(consumerTasks);
 }
 catch (OperationCanceledException)
 {
@@ -185,7 +187,7 @@ static Task SetupCancellation(out CancellationToken token)
     return Task.Factory.StartNew(() =>
     {
         Console.WriteLine("Press ESC to shutdown...");
-        while (!cts.Token.IsCancellationRequested)
+        while (!cts.IsCancellationRequested)
         {
             if (Console.ReadKey(true).Key == ConsoleKey.Escape) cts.Cancel();
         }
